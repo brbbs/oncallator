@@ -3,32 +3,29 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"time"
 
-	"github.com/websdev/oncallator/rotations"
+	"github.com/websdev/oncallator/schedule"
 	"github.com/urfave/cli"
+)
+
+const (
+	FlagIn = "in"
+	FlagOut = "out"
 )
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "oncallator"
-	app.Flags = []cli.Flag{
-		cli.StringSliceFlag{
-			Name: "user",
-			Usage: "list of oncall users to schedule",
+	app.Flags = []cli.Flag {
+		cli.StringFlag{
+			Name: FlagIn,
+			Usage: "If set, will read the base schedule from this file. Otherwise, reads from stdin.",
 		},
 		cli.StringFlag{
-			Name: "start_date",
-			Usage: fmt.Sprintf("An RFC3339-compliant date to start the oncall rotation (e.g., %s)", time.RFC3339),
-		},
-		cli.StringFlag{
-			Name: "end_date",
-			Usage: "Rotations will be scheduled up to the end_date",
-		},
-		cli.DurationFlag{
-			Name: "duration",
-			Usage: "How long a single oncall rotation lasts",
+			Name: FlagOut,
+			Usage: "If set, will write the generated schedule to this file. Otherwise, writes to stdout.",
 		},
 	}
 	app.Action = action
@@ -37,34 +34,48 @@ func main() {
 }
 
 func action(ctx *cli.Context) error {
-	start, end, err := getDates(ctx)
+	s, err := readSchedule(ctx.String(FlagIn))
 	if err != nil {
 		return err
 	}
-	if len(ctx.StringSlice("user")) == 0 {
-		return fmt.Errorf("must provide at least 1 user")
-	}
-	n := rotations.Num(start, end, ctx.Duration("duration"))
-	rotations := rotations.New(ctx.StringSlice("user"), start, ctx.Duration("duration"), n)
-	out, err := json.MarshalIndent(rotations.TerraformLayers(), "", "  ")
+	ns, err := s.Generate()
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(out))
-	return nil
+	return writeSchedule(ctx.String(FlagOut), ns)
 }
 
-func getDates(ctx *cli.Context) (time.Time, time.Time, error) {
-	start, err := time.Parse(time.RFC3339, ctx.String("start_date"))
+func readSchedule(in string) (schedule.Schedule, error) {
+	s := schedule.Schedule{}
+	text := []byte{}
+	if in == "" {
+		t, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return s, err
+		}
+		text = t
+	} else {
+		t, err := ioutil.ReadFile(in)
+		if err != nil {
+			return s, err
+		}
+		text = t
+	}
+	if err := json.Unmarshal(text, &s); err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+func writeSchedule(out string, s schedule.Schedule) error {
+	text, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
-		return start, time.Time{}, fmt.Errorf("bad start_date: %s", err)
+		return err
 	}
-	end, err := time.Parse(time.RFC3339, ctx.String("end_date"))
-	if err != nil {
-		return start, end, fmt.Errorf("bad end_date: %s", err)
+	if out == "" {
+		_, err := fmt.Println(string(text))
+		return err
+	} else {
+		return ioutil.WriteFile(out, text, 0660)
 	}
-	if !start.Before(end) {
-		return start, end, fmt.Errorf("provided start_date after end_date")
-	}
-	return start, end, nil
 }
