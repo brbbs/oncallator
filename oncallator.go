@@ -51,11 +51,16 @@ func action(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	ns, err := s.Generate()
-	if err != nil {
-		return err
+	// TODO(brb): This feels gross. Can we find a way to make Schedule.Generate()
+	// idempotent?
+	if ctx.String(FlagFormat) == FormatSchedule {
+		ns, err := s.Generate()
+		if err != nil {
+			return err
+		}
+		s = ns
 	}
-	out, err := output(ctx.String(FlagFormat), ns)
+	out, err := output(ctx.String(FlagFormat), s)
 	if err != nil {
 		return err
 	}
@@ -79,6 +84,9 @@ func readSchedule(in string) (schedule.Schedule, error) {
 		text = t
 	}
 	if err := json.Unmarshal(text, &s); err != nil {
+		return s, err
+	}
+	if err := s.Validate(); err != nil {
 		return s, err
 	}
 	return s, nil
