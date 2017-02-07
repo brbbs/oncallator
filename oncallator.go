@@ -7,12 +7,17 @@ import (
 	"os"
 
 	"github.com/websdev/oncallator/schedule"
+	"github.com/websdev/oncallator/terraform"
 	"github.com/urfave/cli"
 )
 
 const (
 	FlagIn = "in"
 	FlagOut = "out"
+	FlagFormat = "format"
+
+	FormatSchedule = "schedule"
+	FormatTerraform = "terraform"
 )
 
 func main() {
@@ -26,6 +31,14 @@ func main() {
 		cli.StringFlag{
 			Name: FlagOut,
 			Usage: "If set, will write the generated schedule to this file. Otherwise, writes to stdout.",
+		},
+		cli.StringFlag{
+			Name: FlagFormat,
+			Usage: `Controls the output format of the schedule.
+
+Allowed values:
+	"schedule" -- will perform schedule generation on the input Schedule and output the updated JSON
+	"terraform" -- will output Terraform pagerduty_schedule layers using the input Schedule`,
 		},
 	}
 	app.Action = action
@@ -42,7 +55,11 @@ func action(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return writeSchedule(ctx.String(FlagOut), ns)
+	out, err := output(ctx.String(FlagFormat), ns)
+	if err != nil {
+		return err
+	}
+	return write(ctx.String(FlagOut), out)
 }
 
 func readSchedule(in string) (schedule.Schedule, error) {
@@ -67,11 +84,18 @@ func readSchedule(in string) (schedule.Schedule, error) {
 	return s, nil
 }
 
-func writeSchedule(out string, s schedule.Schedule) error {
-	text, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return err
+func output(format string, s schedule.Schedule) ([]byte, error) {
+	switch format {
+	case FormatSchedule:
+		return json.MarshalIndent(s, "", "  ")
+	case FormatTerraform:
+		return json.MarshalIndent(terraform.NewLayers(s.Rotations), "", "  ")
+	default:
+		return []byte{}, fmt.Errorf("unknown output format: %s", format)
 	}
+}
+
+func write(out string, text []byte) error {
 	if out == "" {
 		_, err := fmt.Println(string(text))
 		return err

@@ -1,5 +1,11 @@
 package terraform
 
+import (
+	"time"
+
+	"github.com/websdev/oncallator/schedule"
+)
+
 type Layer struct {
 	Name string `json:"name"`
 	Start string `json:"start"`
@@ -12,17 +18,17 @@ type Layers struct {
 }
 
 func NewLayers(rs []schedule.Rotation) Layers {
-	l := TerraformLayers{}
+	l := Layers{}
 	for _, r := range rs {
 		start := r.Start.Format(time.RFC3339)
 		// TODO(brb): do we _need_ to supply |end|?
-		primary := TerraformLayer{
+		primary := Layer{
 			Name: "Primary",
 			Start: start,
 			Users: []string{r.Primary},
 		}
 		l.Primary = append(l.Primary, primary)
-		secondary := TerraformLayer{
+		secondary := Layer{
 			Name: "Secondary",
 			Start: start,
 			Users: []string{r.Secondary},
