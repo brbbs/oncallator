@@ -39,6 +39,7 @@ func main() {
 Allowed values:
 	"schedule" -- will perform schedule generation on the input Schedule and output the updated JSON
 	"terraform" -- will output Terraform pagerduty_schedule layers using the input Schedule`,
+			Value: FormatSchedule,
 		},
 	}
 	app.Action = action
@@ -67,32 +68,25 @@ func action(ctx *cli.Context) error {
 	return write(ctx.String(FlagOut), out)
 }
 
-func readSchedule(in string) (schedule.Schedule, error) {
-	s := schedule.Schedule{}
+func readSchedule(in string) (*schedule.Schedule, error) {
 	text := []byte{}
 	if in == "" {
 		t, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return s, err
+			return nil, err
 		}
 		text = t
 	} else {
 		t, err := ioutil.ReadFile(in)
 		if err != nil {
-			return s, err
+			return nil, err
 		}
 		text = t
 	}
-	if err := json.Unmarshal(text, &s); err != nil {
-		return s, err
-	}
-	if err := s.Validate(); err != nil {
-		return s, err
-	}
-	return s, nil
+	return schedule.NewSchedule(text)
 }
 
-func output(format string, s schedule.Schedule) ([]byte, error) {
+func output(format string, s *schedule.Schedule) ([]byte, error) {
 	switch format {
 	case FormatSchedule:
 		return json.MarshalIndent(s, "", "  ")
