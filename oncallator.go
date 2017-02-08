@@ -91,7 +91,7 @@ func output(format string, s *schedule.Schedule) ([]byte, error) {
 	case FormatSchedule:
 		return json.MarshalIndent(s, "", "  ")
 	case FormatTerraform:
-		return json.MarshalIndent(terraform.NewLayers(s.Rotations), "", "  ")
+		return json.MarshalIndent(terraform.NewLayers(s), "", "  ")
 	default:
 		return []byte{}, fmt.Errorf("unknown output format: %s", format)
 	}

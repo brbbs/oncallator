@@ -7,9 +7,10 @@ import (
 )
 
 type Layer struct {
-	Name string `json:"name"`
 	Start string `json:"start"`
 	Users []string `json:"users"`
+	RotationVirtualStart string `json:"rotation_virtual_start"`
+	RotationTurnLengthSeconds int `json:"rotation_turn_length_seconds"`
 }
 
 type Layers struct {
@@ -17,21 +18,22 @@ type Layers struct {
 	Secondary []Layer
 }
 
-func NewLayers(rs []schedule.Rotation) Layers {
+func NewLayers(s *schedule.Schedule) Layers {
 	l := Layers{}
-	for _, r := range rs {
+	for _, r := range s.Rotations {
 		start := r.Start.Format(time.RFC3339)
-		// TODO(brb): do we _need_ to supply |end|?
 		primary := Layer{
-			Name: "Primary",
 			Start: start,
 			Users: []string{r.Primary},
+			RotationVirtualStart: start,
+			RotationTurnLengthSeconds: int(s.RotationDuration.Seconds()),
 		}
 		l.Primary = append(l.Primary, primary)
 		secondary := Layer{
-			Name: "Secondary",
 			Start: start,
 			Users: []string{r.Secondary},
+			RotationVirtualStart: start,
+			RotationTurnLengthSeconds: int(s.RotationDuration.Seconds()),
 		}
 		l.Secondary = append(l.Secondary, secondary)
 	}
